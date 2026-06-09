@@ -7,6 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![No API Keys](https://img.shields.io/badge/API%20Keys-none-brightgreen)](/)
 
+
 A local Perplexity-style search engine that queries DuckDuckGo, scrapes the top results, and feeds the content to a local LLM via [Ollama](https://ollama.com) to generate a cited, streaming answer — no API keys, no cloud, no data leaving your computer.
 
 📺 **Built for this video → [I Cloned Perplexity AI in 2 Days (FREE, Runs Locally)](https://www.youtube.com/watch?v=qEN9RRk-E0I)**
