@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LocalSearch — a local RAG search engine powered by Ollama and DuckDuckGo.">
+    <title>LocalSearch — RAG Search Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css?v=2.0">
+    <!-- PDF.js library for client-side PDF parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo-container">
+                <div class="logo-icon"></div>
+                <span class="logo-text">LocalSearch<span class="logo-subtext">RAG</span></span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" title="Search"><i data-lucide="search"></i><span>New Search</span></button>
+                <button class="nav-btn" id="toggle-debug-btn" title="Inspector"><i data-lucide="terminal"></i><span>Inspector</span></button>
+            </nav>
+
+            <div class="server-status">
+                <div class="status-indicator" id="status-dot"></div>
+                <span class="status-text" id="status-label">Checking Ollama...</span>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="app-header">
+                <div class="scraper-controls">
+                    <span class="control-label">Scraper Mode:</span>
+                    <div class="segmented-control">
+                        <input type="radio" id="mode-raw" name="scraper-mode" value="raw">
+                        <label for="mode-raw" class="control-tab raw-tab">
+                            <i data-lucide="alert-triangle"></i>
+                            <span>BS4 Raw HTML</span>
+                        </label>
+
+                        <input type="radio" id="mode-clean" name="scraper-mode" value="clean" checked>
+                        <label for="mode-clean" class="control-tab clean-tab">
+                            <i data-lucide="zap"></i>
+                            <span>Jina Reader (Clean)</span>
+                        </label>
+                        <div class="control-slider"></div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-scroll">
+                <div class="search-hero" id="search-hero">
+                    <h1 class="hero-title">Search the web, locally.</h1>
+
+                    <div class="search-bar-container">
+                        <form id="search-form" class="search-form">
+                            <textarea id="search-input" placeholder="Ask anything..." rows="1" required></textarea>
+                            <div class="search-attachments-container hidden" id="search-attachments-container"></div>
+                            <div class="search-bar-footer">
+                                <div class="search-bar-options">
+                                    <div class="focus-dropdown-wrapper">
+                                        <button type="button" id="focus-btn" class="bar-option-btn" title="Focus search">
+                                            <i data-lucide="target"></i><span id="focus-btn-text">Focus</span>
+                                        </button>
+                                        <div class="focus-dropdown-menu hidden" id="focus-dropdown-menu">
+                                            <div class="focus-dropdown-item active" data-value="web" data-icon="globe">
+                                                <i data-lucide="globe"></i>
+                                                <div class="item-text">
+                                                    <span class="item-title">All</span>
+                                                    <span class="item-desc">Search the entire web</span>
+                                                </div>
+                                            </div>
+                                            <div class="focus-dropdown-item" data-value="academic" data-icon="book-open">
+                                                <i data-lucide="book-open"></i>
+                                                <div class="item-text">
+                                                    <span class="item-title">Academic</span>
+                                                    <span class="item-desc">Search academic papers</span>
+                                                </div>
+                                            </div>
+                                            <div class="focus-dropdown-item" data-value="writing" data-icon="pencil-line">
+                                                <i data-lucide="pencil-line"></i>
+                                                <div class="item-text">
+                                                    <span class="item-title">Writing</span>
+                                                    <span class="item-desc">Chat without search</span>
+                                                </div>
+                                            </div>
+                                            <div class="focus-dropdown-item" data-value="youtube" data-icon="video">
+                                                <i data-lucide="video"></i>
+                                                <div class="item-text">
+                                                    <span class="item-title">YouTube</span>
+                                                    <span class="item-desc">Search videos info</span>
+                                                </div>
+                                            </div>
+                                            <div class="focus-dropdown-item" data-value="reddit" data-icon="message-square">
+                                                <i data-lucide="message-square"></i>
+                                                <div class="item-text">
+                                                    <span class="item-title">Reddit</span>
+                                                    <span class="item-desc">Search discussions</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="attach-btn" class="bar-option-btn" title="Attach file">
+                                        <i data-lucide="paperclip"></i><span>Attach</span>
+                                    </button>
+                                    <input type="file" id="file-input" multiple style="display: none;">
+                                </div>
+                                <button type="submit" class="submit-btn" id="submit-btn">
+                                    <i data-lucide="arrow-right"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Pipeline Diagram -->
+                <section class="blueprint-section" id="blueprint-section">
+                    <div class="section-header">
+                        <h2 class="section-title"><i data-lucide="workflow"></i> Search Pipeline</h2>
+                        <span class="section-subtitle">Live data flow</span>
+                    </div>
+
+                    <div class="blueprint-flow">
+                        <svg class="flow-connectors" id="flow-connectors">
+                            <path class="flow-path" id="path-1-2" d="" />
+                            <path class="flow-path" id="path-2-3" d="" />
+                            <path class="flow-path" id="path-3-4" d="" />
+                            <path class="flow-path" id="path-4-5" d="" />
+                            <path class="flow-path" id="path-5-6" d="" />
+                        </svg>
+
+                        <div class="blueprint-node" id="node-query">
+                            <div class="node-icon"><i data-lucide="message-square"></i></div>
+                            <div class="node-content">
+                                <h3 class="node-title">1. Query</h3>
+                                <span class="node-status">Idle</span>
+                            </div>
+                        </div>
+
+                        <div class="blueprint-node" id="node-search">
+                            <div class="node-icon"><i data-lucide="globe"></i></div>
+                            <div class="node-content">
+                                <h3 class="node-title">2. Web Search</h3>
+                                <span class="node-status">Idle</span>
+                            </div>
+                        </div>
+
+                        <div class="blueprint-node" id="node-scraper">
+                            <div class="node-icon" id="scraper-node-icon"><i data-lucide="code-2"></i></div>
+                            <div class="node-content">
+                                <h3 class="node-title">3. Scraper</h3>
+                                <span class="node-status">Idle</span>
+                            </div>
+                        </div>
+
+                        <div class="blueprint-node" id="node-context">
+                            <div class="node-icon"><i data-lucide="file-symlink"></i></div>
+                            <div class="node-content">
+                                <h3 class="node-title">4. Context</h3>
+                                <span class="node-status">Idle</span>
+                            </div>
+                        </div>
+
+                        <div class="blueprint-node" id="node-llm">
+                            <div class="node-icon"><i data-lucide="cpu"></i></div>
+                            <div class="node-content">
+                                <h3 class="node-title">5. Local Model</h3>
+                                <span class="node-status">Idle</span>
+                            </div>
+                        </div>
+
+                        <div class="blueprint-node" id="node-answer">
+                            <div class="node-icon"><i data-lucide="check-circle-2"></i></div>
+                            <div class="node-content">
+                                <h3 class="node-title">6. Answer</h3>
+                                <span class="node-status">Idle</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Results -->
+                <section class="results-section hidden" id="results-section">
+                    <h2 class="search-query-title" id="display-query"></h2>
+
+                    <div class="sources-container">
+                        <div class="sources-header">
+                            <i data-lucide="library"></i> Sources
+                        </div>
+                        <div class="sources-grid" id="sources-grid"></div>
+                    </div>
+
+                    <div class="answer-container">
+                        <div class="answer-header">
+                            <i data-lucide="sparkles"></i> Answer
+                        </div>
+
+                        <div class="pipeline-warning hidden" id="pipeline-warning">
+                            <div class="warning-icon"><i data-lucide="alert-triangle"></i></div>
+                            <div class="warning-text">
+                                <strong>Raw HTML mode — noisy context</strong>
+                                The BS4 scraper returned unfiltered HTML including navigation, headers and cookie banners. The model may produce less accurate results.
+                            </div>
+                        </div>
+
+                        <div class="pipeline-success hidden" id="pipeline-success">
+                            <div class="success-icon"><i data-lucide="check-circle-2"></i></div>
+                            <div class="success-text">
+                                <strong>Clean markdown delivered</strong>
+                                Jina Reader extracted the main content from each page. The model received structured, noise-free text.
+                            </div>
+                        </div>
+
+                        <div class="answer-body" id="answer-body"></div>
+                    </div>
+
+                    <button class="new-search-btn" id="new-search-btn">
+                        <i data-lucide="plus"></i> New search
+                    </button>
+                </section>
+            </div>
+        </main>
+
+        <!-- Inspector Sidebar -->
+        <aside class="debug-sidebar collapsed" id="debug-sidebar">
+            <div class="debug-header">
+                <h3><i data-lucide="terminal"></i> Inspector</h3>
+                <button class="close-debug-btn" id="close-debug-btn"><i data-lucide="x"></i></button>
+            </div>
+
+            <div class="debug-content">
+                <div class="debug-card">
+                    <h4>Ollama Status</h4>
+                    <div class="status-row">
+                        <span class="status-lbl">Running:</span>
+                        <span class="status-val bold" id="inspector-ollama-running">Checking...</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-lbl">Models:</span>
+                        <span class="status-val" id="inspector-models">None</span>
+                    </div>
+                </div>
+
+                <div class="debug-card">
+                    <h4>Context Stats</h4>
+                    <div class="status-row">
+                        <span class="status-lbl">Raw text:</span>
+                        <span class="status-val" id="stats-raw-chars">0 chars</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-lbl">Clean text:</span>
+                        <span class="status-val" id="stats-clean-chars">0 chars</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-lbl">Filtered out:</span>
+                        <span class="status-val red" id="stats-wasted-chars">0 chars (0%)</span>
+                    </div>
+                </div>
+
+                <div class="debug-tabs">
+                    <button class="debug-tab-btn active" id="btn-tab-scraped">Scraped Data</button>
+                    <button class="debug-tab-btn" id="btn-tab-prompt">System Prompt</button>
+                </div>
+
+                <div class="debug-pane active" id="pane-scraped">
+                    <p class="pane-description">Text extracted from scraped pages and passed to the model.</p>
+                    <pre class="debug-pre" id="debug-scraped-content">Waiting for search...</pre>
+                </div>
+
+                <div class="debug-pane" id="pane-prompt">
+                    <p class="pane-description">System prompt sent to the local model for this request.</p>
+                    <pre class="debug-pre" id="debug-prompt-content">Waiting for search...</pre>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="app.js?v=2.0"></script>
+</body>
+</html>
